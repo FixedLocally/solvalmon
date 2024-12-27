@@ -1,72 +1,13 @@
 use std::vec;
 
-use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
-use rocket::{catch, catchers, http::ContentType, launch, response::Responder, State};
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use solana_client::{nonblocking::rpc_client, rpc_response::RpcVoteAccountInfo};
+use handlers::{error::{internal_error, not_found}, stats, status, tower};
+use rocket::{catch, catchers, launch};
+use solana_client::nonblocking::rpc_client;
 use solana_sdk::{commitment_config::CommitmentConfig, signer::Signer};
 
 mod config;
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct Status<'r> {
-    slot: u64,
-    identity: &'r str,
-    version: &'r str,
-    identity_balance: u64,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct Stats {
-    my_credits: u64,
-    median_credits: u64,
-}
-
-struct ApiResponder {
-    pub success: bool,
-    pub message: Option<String>,
-    pub inner: Option<Value>,
-    pub field_name: String,
-}
-
-impl ApiResponder {
-    pub fn new(success: bool, message: Option<String>, inner: Option<Value>, field_name: String) -> Self {
-        Self {
-            success,
-            message,
-            inner,
-            field_name,
-        }
-    }
-
-    pub fn success(inner: Option<Value>, field_name: String) -> Self {
-        Self::new(true, None, inner, field_name)
-    }
-
-    pub fn error(message: String) -> Self {
-        Self::new(false, Some(message), None, "error".to_string())
-    }
-}
-
-impl <'r, 'o: 'r> Responder<'r, 'o> for ApiResponder {
-    fn respond_to(self, _: &'r rocket::Request) -> rocket::response::Result<'o> {
-        let mut json = json!({
-            "success": self.success,
-        });
-        if let Some(message) = self.message {
-            json["message"] = json!(message);
-        }
-        if let Some(inner) = self.inner {
-            json[self.field_name] = inner;
-        }
-        let resp = json.to_string();
-        rocket::Response::build()
-            .header(ContentType::JSON)
-            .sized_body(resp.len(), std::io::Cursor::new(resp))
-            .ok()
-    }
-}
+mod handlers;
+mod responder;
 
 struct ConfigWrapper {
     config: config::Config,
@@ -85,85 +26,5 @@ fn rocket() -> _ {
         rpc_client,
         primary_id,
     };
-    rocket::build().manage(config_wrapper).mount("/", rocket::routes![status, stats, tower]).register("/", catchers![not_found])
-}
-
-#[catch(404)]
-fn not_found() -> &'static str {
-    "Not found!"
-}
-
-#[rocket::get("/status")]
-async fn status(config: &State<ConfigWrapper>) -> ApiResponder {
-    let (slot, identity, version, acct) = tokio::join!(
-        config.rpc_client.get_slot(),
-        config.rpc_client.get_identity(),
-        config.rpc_client.get_version(),
-        config.rpc_client.get_account(&config.primary_id),
-    );
-    ApiResponder::success(
-        Some(json!(Status {
-            slot: slot.unwrap(),
-            identity: &identity.unwrap().to_string()[..],
-            version: &version.unwrap().to_string()[..],
-            identity_balance: acct.unwrap().lamports,
-        })),
-        "status".to_string(),
-    )
-}
-
-fn get_current_credits(vote_account: &RpcVoteAccountInfo) -> u64 {
-    let i = vote_account.epoch_credits.iter().enumerate().fold(0, |acc, (i, (epoch, _, _))| {
-        if epoch > &vote_account.epoch_credits[acc].0 {
-            i
-        } else {
-            acc
-        }
-    });
-    vote_account.epoch_credits[i].1 - vote_account.epoch_credits[i].2
-}
-
-#[rocket::get("/stats")]
-async fn stats(config: &State<ConfigWrapper>) -> ApiResponder {
-    let mut cluster_credits = vec![];
-    let mut my_credits = 0;
-    config.rpc_client.get_vote_accounts().await.map_or_else(
-        |e| ApiResponder::error(e.to_string()),
-        |vote_accounts| {
-            for vote_account in vote_accounts.current {
-                if vote_account.vote_pubkey == config.config.vote_account {
-                    my_credits = get_current_credits(&vote_account);
-                }
-                cluster_credits.push(get_current_credits(&vote_account));
-            }
-            ApiResponder::success(None, "stats".to_string())
-        },
-    );
-    cluster_credits.sort();
-    let len = cluster_credits.len();
-    let median_credits = match len % 2 {
-        0 => (cluster_credits[len / 2 - 1] + cluster_credits[len / 2]) / 2,
-        1 => cluster_credits[len / 2],
-        _ => unreachable!(),
-    };
-    ApiResponder::success(
-        Some(json!(Stats {
-            my_credits,
-            median_credits,
-        })),
-        "stats".to_string(),
-    )
-}
-
-#[rocket::get("/tower")]
-async fn tower(config: &State<ConfigWrapper>) -> ApiResponder {
-    let tower_path = format!("{}/tower-1_9-{}.bin", config.config.ledger_dir, config.primary_id.to_string());
-    // read tower file to string
-    let tower = std::fs::read(tower_path).unwrap();
-    ApiResponder::success(
-        Some(json!({
-            "tower": BASE64_STANDARD_NO_PAD.encode(tower),
-        })),
-        "tower".to_string(),
-    )
+    rocket::build().manage(config_wrapper).mount("/", rocket::routes![status::handler, stats::handler, tower::handler]).register("/", catchers![not_found, internal_error])
 }
