@@ -1,3 +1,9 @@
 {
-    "rpc_port": 6969
+    "rpc_port": 6969,
+    "vote_account": "mintrNtxN3PhAB45Pt41XqyKghTTpqcoBkQTZqh96iR",
+    "ledger_dir": "/home/sol/solana/ledger",
+    "keys": {
+        "primary": "/home/sol/solana/keys/identity.json",
+        "secondary": "/home/sol/solana/keys/identity-secondary.json"
+    }
 }
