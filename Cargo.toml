@@ -1,0 +1,10 @@
+[package]
+name = "solvalmon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1.0.216"
+serde_json = "1.0.134"
+solana-client = "2.1.7"
+tokio = "1.42.0"
