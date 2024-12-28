@@ -1,9 +1,10 @@
 use rocket::{data::{FromData, Outcome, ToByteUnit}, http::Status, Data, Request, State};
 use serde::Deserialize;
 use sha256::digest;
-use solana_sdk::signature::Signature;
 
 use crate::config::Config;
+
+use super::lib::check_sig;
 
 pub struct SignedPayload<T: for<'a> Deserialize<'a>> {
     pub inner: T,
@@ -23,15 +24,10 @@ impl <'r, T: for<'a> Deserialize<'a>> FromData<'r> for SignedPayload<T> {
             Err(_) => return Outcome::Error((Status::InternalServerError, ())),
         }
         let str_to_sign = format!("{} {} {}", req.method(), req.uri().path().as_str(), digest(payload.as_bytes()));
-        let is_valid = |key: &str| -> bool {
-            key.parse::<Signature>().map_or_else(|_| false, |sig| {
-                sig.verify(&config.admin.to_bytes(), str_to_sign.as_bytes())
-            })
-        };
         
         match req.headers().get_one("x-api-key") {
             None => Outcome::Error((Status::Unauthorized, ())),
-            Some(key) if is_valid(key) => Outcome::Success(SignedPayload {
+            Some(key) if check_sig(config.admin, key, &str_to_sign) => Outcome::Success(SignedPayload {
                 inner: serde_json::from_str(&payload).unwrap(),
             }),
             Some(_) => Outcome::Error((Status::Unauthorized, ())),
