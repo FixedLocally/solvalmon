@@ -2,12 +2,12 @@ use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
 use rocket::State;
 use serde_json::json;
 
-use crate::{responder::ApiResponder, ConfigWrapper};
+use crate::{auth::Auth, config::Config, responder::ApiResponder};
 
 
 #[rocket::get("/tower")]
-pub async fn handler(config: &State<ConfigWrapper>) -> ApiResponder {
-    let tower_path = format!("{}/tower-1_9-{}.bin", config.config.ledger_dir, config.primary_id.to_string());
+pub async fn handler(_auth: Auth, config: &State<Config>) -> ApiResponder {
+    let tower_path = format!("{}/tower-1_9-{}.bin", config.ledger_dir, config.primary_id.to_string());
     // read tower file to string
     let tower = std::fs::read(tower_path).unwrap();
     ApiResponder::success(

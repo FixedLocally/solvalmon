@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 
-use crate::{responder::ApiResponder, ConfigWrapper};
+use crate::{auth::Auth, responder::ApiResponder, config::Config};
 
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -24,14 +24,14 @@ fn get_current_credits(vote_account: &RpcVoteAccountInfo) -> u64 {
 }
 
 #[rocket::get("/stats")]
-pub async fn handler(config: &State<ConfigWrapper>) -> ApiResponder {
+pub async fn handler(_auth: Auth, config: &State<Config>) -> ApiResponder {
     let mut cluster_credits = vec![];
     let mut my_credits = 0;
     config.rpc_client.get_vote_accounts().await.map_or_else(
         |e| ApiResponder::error(e.to_string()),
         |vote_accounts| {
             for vote_account in vote_accounts.current {
-                if vote_account.vote_pubkey == config.config.vote_account {
+                if vote_account.vote_pubkey == config.vote_id.to_string() {
                     my_credits = get_current_credits(&vote_account);
                 }
                 cluster_credits.push(get_current_credits(&vote_account));

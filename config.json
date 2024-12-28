@@ -5,5 +5,6 @@
     "keys": {
         "primary": "/home/sol/solana/keys/identity.json",
         "secondary": "/home/sol/solana/keys/identity-secondary.json"
-    }
+    },
+    "admin": "GwgSsEGoUEPBznNUq1mkGvLXY6357wBmKDEyWjGHDxRf"
 }

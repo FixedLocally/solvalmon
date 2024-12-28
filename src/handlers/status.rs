@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::join;
 
-use crate::{responder::ApiResponder, ConfigWrapper};
+use crate::{auth::Auth, responder::ApiResponder, config::Config};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct Status<'r> {
@@ -14,7 +14,7 @@ struct Status<'r> {
 }
 
 #[rocket::get("/status")]
-pub async fn handler(config: &State<ConfigWrapper>) -> ApiResponder {
+pub async fn handler(_auth: Auth, config: &State<Config>) -> ApiResponder {
     let (slot, identity, version, acct) = join!(
         config.rpc_client.get_slot(),
         config.rpc_client.get_identity(),
