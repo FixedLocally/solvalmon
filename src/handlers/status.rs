@@ -14,7 +14,7 @@ struct Status<'r> {
 }
 
 #[rocket::get("/status")]
-pub async fn handler(_auth: Auth, config: &State<Config>) -> ApiResponder {
+pub async fn get(_auth: Auth, config: &State<Config>) -> ApiResponder {
     let (slot, identity, version, acct) = join!(
         config.rpc_client.get_slot(),
         config.rpc_client.get_identity(),

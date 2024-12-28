@@ -24,7 +24,7 @@ fn get_current_credits(vote_account: &RpcVoteAccountInfo) -> u64 {
 }
 
 #[rocket::get("/stats")]
-pub async fn handler(_auth: Auth, config: &State<Config>) -> ApiResponder {
+pub async fn get(_auth: Auth, config: &State<Config>) -> ApiResponder {
     let mut cluster_credits = vec![];
     let mut my_credits = 0;
     config.rpc_client.get_vote_accounts().await.map_or_else(

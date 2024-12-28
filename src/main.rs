@@ -20,6 +20,6 @@ fn rocket() -> _ {
     let config_wrapper = Config::new("config.json");
     rocket::build()
         .manage(config_wrapper)
-        .mount("/", rocket::routes![status::handler, stats::handler, tower::handler])
+        .mount("/", rocket::routes![status::get, stats::get, tower::get, tower::post])
         .register("/", catchers![not_found, internal_error])
 }

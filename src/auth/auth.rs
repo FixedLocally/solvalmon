@@ -1,5 +1,5 @@
 use rocket::{http::Status, request::{FromRequest, Outcome}, Request, State};
-use solana_sdk::{bs58::decode, signature::Signature};
+use solana_sdk::signature::Signature;
 
 use crate::config::Config;
 
@@ -16,7 +16,7 @@ impl<'r> FromRequest<'r> for Auth {
         print!("{}: ", payload);
         let is_valid = |key: &str| -> bool {
             key.parse::<Signature>().map_or_else(|_| false, |sig| {
-                sig.verify(&decode(&config.admin).into_vec().unwrap()[..], payload.as_bytes())
+                sig.verify(&config.admin.to_bytes(), payload.as_bytes())
             })
         };
         
