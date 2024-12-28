@@ -23,6 +23,10 @@ impl ApiResponder {
         Self::new(true, None, inner, field_name)
     }
 
+    pub fn success_empty() -> Self {
+        Self::new(true, None, None, "".to_string())
+    }
+
     pub fn error(message: String) -> Self {
         Self::new(false, Some(message), None, "error".to_string())
     }
