@@ -1,4 +1,6 @@
 /target
 /pki/*.crt
 /pki/*.key
+/pki/*.srl
+/pki/*.csr
 admin.json
