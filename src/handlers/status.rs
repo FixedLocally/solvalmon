@@ -1,9 +1,9 @@
-use rocket::State;
+use rocket::{mtls::Certificate, State};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::join;
 
-use crate::{auth::Auth, responder::ApiResponder, config::Config};
+use crate::{responder::ApiResponder, config::Config};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct Status<'r> {
@@ -14,7 +14,7 @@ struct Status<'r> {
 }
 
 #[rocket::get("/status")]
-pub async fn get(_auth: Auth, config: &State<Config>) -> ApiResponder {
+pub async fn get(_auth: Certificate<'_>, config: &State<Config>) -> ApiResponder {
     let (slot, identity, version, acct) = join!(
         config.rpc_client.get_slot(),
         config.rpc_client.get_identity(),

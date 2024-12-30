@@ -1,10 +1,10 @@
 use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
-use rocket::State;
+use rocket::{mtls::Certificate, serde::json::Json, State};
 use serde::Deserialize;
 use serde_json::json;
 // use solana_core::consensus::TowerVersions;
 
-use crate::{auth::{Auth, SignedPayload}, config::Config, responder::ApiResponder};
+use crate::{config::Config, responder::ApiResponder};
 
 #[derive(Debug, Deserialize)]
 pub struct PostTower {
@@ -12,7 +12,7 @@ pub struct PostTower {
 }
 
 #[rocket::get("/tower")]
-pub async fn get(_auth: Auth, config: &State<Config>) -> ApiResponder {
+pub async fn get(_auth: Certificate<'_>, config: &State<Config>) -> ApiResponder {
     let tower_path = format!("{}/tower-1_9-{}.bin", config.ledger_dir, config.primary_id.to_string());
     // read tower file to string
     let tower = std::fs::read(&tower_path).unwrap();
@@ -27,13 +27,13 @@ pub async fn get(_auth: Auth, config: &State<Config>) -> ApiResponder {
 }
 
 #[rocket::post("/tower", data = "<tower>")]
-pub async fn post(config: &State<Config>, tower: SignedPayload<PostTower>) -> ApiResponder {
+pub async fn post(_auth: Certificate<'_>, config: &State<Config>, tower: Json<PostTower>) -> ApiResponder {
     let node_id = config.rpc_client.get_identity().await.unwrap();
     if node_id == config.primary_id {
         return ApiResponder::error("Refused to override my own tower".to_string());
     }
     let tower_path = format!("{}/tower-1_9-{}.bin", config.ledger_dir, config.primary_id.to_string());
-    let raw_tower = BASE64_STANDARD_NO_PAD.decode(tower.inner.tower);
+    let raw_tower = BASE64_STANDARD_NO_PAD.decode(&tower.tower);
     if raw_tower.is_err() {
         return ApiResponder::error("Invalid base64".to_string());
     }

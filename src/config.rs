@@ -34,7 +34,6 @@ pub struct Config {
     pub vote_id: Pubkey,
     pub ledger_dir: String,
     pub keys: KeysConfig,
-    pub admin: Pubkey
 }
 
 impl Config {
@@ -49,7 +48,6 @@ impl Config {
             vote_id: Pubkey::from_str(&config.vote_account).unwrap(),
             ledger_dir: config.ledger_dir,
             keys: config.keys,
-            admin: Pubkey::from_str(&config.admin).unwrap(),
         }
     }
 }

@@ -1,6 +1,11 @@
 use rocket::catch;
 
 
+#[catch(401)]
+pub fn unauthorised() -> &'static str {
+    "unauthorised"
+}
+
 #[catch(404)]
 pub fn not_found() -> &'static str {
     "not found"
