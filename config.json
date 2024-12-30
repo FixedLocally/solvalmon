@@ -2,9 +2,9 @@
     "rpc_port": 6969,
     "vote_account": "mintrNtxN3PhAB45Pt41XqyKghTTpqcoBkQTZqh96iR",
     "ledger_dir": "/home/sol/solana/ledger",
+    "validator_binary": "/home/sol/.local/share/solana/install/releases/v2.0.18-jito/bin/agave-validator",
     "keys": {
         "primary": "/home/sol/solana/keys/identity.json",
         "secondary": "/home/sol/solana/keys/identity-secondary.json"
-    },
-    "admin": "GwgSsEGoUEPBznNUq1mkGvLXY6357wBmKDEyWjGHDxRf"
+    }
 }
