@@ -1,6 +1,6 @@
 use std::{fs, net::Ipv4Addr, vec};
 
-use handlers::{error::{internal_error, not_found, unauthorised}, post, set_identity, stats, status, tower};
+use handlers::{error::{bad_request, internal_error, not_found, unauthorised}, post, set_identity, stats, status, tower};
 use rocket::{catchers, config::{MutualTls, TlsConfig}, launch, Config};
 use solana_sdk::signer::Signer;
 
@@ -36,7 +36,7 @@ fn rocket() -> _ {
     rocket::build()
         .manage(config_wrapper)
         .mount("/", rocket::routes![status::get, stats::get, tower::get, tower::post, post::post, set_identity::post])
-        .register("/", catchers![not_found, internal_error, unauthorised])
+        .register("/", catchers![not_found, internal_error, unauthorised, bad_request])
         .configure(Config {
             address: std::net::IpAddr::V4("0.0.0.0".parse::<Ipv4Addr>().unwrap()),
             port: 8888,
