@@ -1,5 +1,9 @@
 use rocket::catch;
 
+#[catch(400)]
+pub fn bad_request() -> &'static str {
+    "bad request"
+}
 
 #[catch(401)]
 pub fn unauthorised() -> &'static str {

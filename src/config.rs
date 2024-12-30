@@ -9,8 +9,8 @@ pub struct ConfigInner {
     pub rpc_port: u16,
     pub vote_account: String,
     pub ledger_dir: String,
+    pub validator_binary: String,
     pub keys: KeysConfig,
-    pub admin: String,
 }
 
 impl ConfigInner {
@@ -33,6 +33,7 @@ pub struct Config {
     pub primary_id: Pubkey,
     pub vote_id: Pubkey,
     pub ledger_dir: String,
+    pub validator_binary: String,
     pub keys: KeysConfig,
 }
 
@@ -47,6 +48,7 @@ impl Config {
             primary_id,
             vote_id: Pubkey::from_str(&config.vote_account).unwrap(),
             ledger_dir: config.ledger_dir,
+            validator_binary: config.validator_binary,
             keys: config.keys,
         }
     }
