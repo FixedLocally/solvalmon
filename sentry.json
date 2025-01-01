@@ -1,0 +1,16 @@
+{
+    "nodes": [
+        "https://la2.validators.hanabi.so:8888",
+        "https://la3.validators.hanabi.so:8888"
+    ],
+    "auth": {
+        "cert": "pki/mtls_auth.crt",
+        "key": "pki/mtls_auth.key"
+    },
+    "external_rpc": "https://api.mainnet-beta.solana.com",
+    "vote_id": "mintrNtxN3PhAB45Pt41XqyKghTTpqcoBkQTZqh96iR",
+    "checks": {
+        "identity_balance": 5000000000,
+        "unhealthy_threshold": 64
+    }
+}
