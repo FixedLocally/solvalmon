@@ -21,14 +21,11 @@ pub async fn post(_auth: Certificate<'_>, identity: Json<SetIdentity>, config: &
         IdentityVariant::Primary => &config.keys.primary,
         IdentityVariant::Secondary => &config.keys.secondary,
     };
-    let output = std::process::Command::new(&config.validator_binary)
-        .arg("set-identity")
-        .arg(identity_path)
-        .output()
-        .expect("failed to execute process");
-    let version = String::from_utf8_lossy(&output.stdout);
-    ApiResponder::success(Some(json!({
-        "version": version.to_string(),
-        "identity": identity_path.to_string(),
-    })), "set_identity".to_string())
+    match config.admin_client.set_identity(identity_path.clone(), true).await {
+        Ok(_) => return ApiResponder::success(Some(json!({
+            "identity": identity_path.to_string(),
+        })), "set_identity".to_string()),
+        Err(e) => return ApiResponder::error(e.to_string()),
+    }
+    
 }

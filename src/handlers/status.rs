@@ -12,17 +12,20 @@ struct Status<'r> {
     version: &'r str,
     identity_balance: u64,
     genesis_hash: &'r str,
+    uptime_ms: u64,
 }
 
 #[rocket::get("/status")]
 pub async fn get(_auth: Certificate<'_>, config: &State<Config>) -> ApiResponder {
-    let (slot, identity, version, acct, genesis_hash) = join!(
+    let (slot, identity, version, acct, genesis_hash, start_time) = join!(
         config.rpc_client.get_slot(),
         config.rpc_client.get_identity(),
         config.rpc_client.get_version(),
         config.rpc_client.get_account(&config.primary_id),
         config.rpc_client.get_genesis_hash(),
+        config.admin_client.start_time(),
     );
+    let uptime_ms = start_time.unwrap().elapsed().unwrap().as_millis() as u64;
     ApiResponder::success(
         Some(json!(Status {
             slot: slot.unwrap(),
@@ -30,6 +33,7 @@ pub async fn get(_auth: Certificate<'_>, config: &State<Config>) -> ApiResponder
             version: &version.unwrap().to_string()[..],
             identity_balance: acct.unwrap().lamports,
             genesis_hash: &genesis_hash.unwrap().to_string()[..],
+            uptime_ms,
         })),
         "status".to_string(),
     )
