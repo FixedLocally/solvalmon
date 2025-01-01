@@ -6,13 +6,13 @@ use solana_client::nonblocking::rpc_client;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
 
 #[derive(Deserialize, Debug)]
-struct ConfigInner {
+struct ValidatorConfigInner {
     pub vote_account: String,
     pub ledger_dir: String,
     pub keys: KeysConfig,
 }
 
-impl ConfigInner {
+impl ValidatorConfigInner {
     pub fn new(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let file = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(file);
@@ -27,7 +27,7 @@ pub struct KeysConfig {
     pub secondary: String,
 }
 
-pub struct Config {
+pub struct ValidatorConfig {
     pub admin_client: admin_rpc_service::AdminRpcClient,
     pub rpc_client: rpc_client::RpcClient,
     pub primary_id: Pubkey,
@@ -36,9 +36,9 @@ pub struct Config {
     pub keys: KeysConfig,
 }
 
-impl Config {
+impl ValidatorConfig {
     pub async fn new(path: &str) -> Self {
-        let config = ConfigInner::new(path).unwrap();
+        let config = ValidatorConfigInner::new(path).unwrap();
         let admin_client = match admin_rpc_service::connect(&Path::new(&config.ledger_dir)).await {
             Ok(client) => client,
             Err(e) => panic!("Failed to connect to admin RPC: {}", e),

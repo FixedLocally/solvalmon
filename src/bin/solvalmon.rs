@@ -22,7 +22,7 @@ async fn rocket() -> _ {
     panic_if_missing(TLS_KEY_PATH);
     panic_if_missing(MTLS_CA_PATH);
     panic_if_missing(CONFIG_PATH);
-    let config = config::Config::new(CONFIG_PATH).await;
+    let config = config::ValidatorConfig::new(CONFIG_PATH).await;
     rocket::build()
         .manage(config)
         .mount("/", rocket::routes![status::get, stats::get, tower::get, tower::post, post::post, set_identity::post])

@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde_json::json;
 // use solana_core::consensus::TowerVersions;
 
-use crate::{config::Config, responder::ApiResponder};
+use crate::{config::ValidatorConfig, responder::ApiResponder};
 
 #[derive(Debug, Deserialize)]
 pub struct PostTower {
@@ -12,7 +12,7 @@ pub struct PostTower {
 }
 
 #[rocket::get("/tower")]
-pub async fn get(_auth: Certificate<'_>, config: &State<Config>) -> ApiResponder {
+pub async fn get(_auth: Certificate<'_>, config: &State<ValidatorConfig>) -> ApiResponder {
     let tower_path = format!("{}/tower-1_9-{}.bin", config.ledger_dir, config.primary_id.to_string());
     // read tower file to string
     let tower = std::fs::read(&tower_path).unwrap();
@@ -27,7 +27,7 @@ pub async fn get(_auth: Certificate<'_>, config: &State<Config>) -> ApiResponder
 }
 
 #[rocket::post("/tower", data = "<tower>")]
-pub async fn post(_auth: Certificate<'_>, config: &State<Config>, tower: Json<PostTower>) -> ApiResponder {
+pub async fn post(_auth: Certificate<'_>, config: &State<ValidatorConfig>, tower: Json<PostTower>) -> ApiResponder {
     let node_id = config.rpc_client.get_identity().await.unwrap();
     if node_id == config.primary_id {
         return ApiResponder::error("Refused to override my own tower".to_string());

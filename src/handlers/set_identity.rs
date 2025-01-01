@@ -2,7 +2,7 @@ use rocket::{mtls::Certificate, serde::json::Json, State};
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::{config::Config, responder::ApiResponder};
+use crate::{config::ValidatorConfig, responder::ApiResponder};
 
 #[derive(Debug, Deserialize, )]
 pub enum IdentityVariant {
@@ -16,7 +16,7 @@ pub struct SetIdentity {
 }
 
 #[rocket::post("/set_identity", data = "<identity>")]
-pub async fn post(_auth: Certificate<'_>, identity: Json<SetIdentity>, config: &State<Config>) -> ApiResponder {
+pub async fn post(_auth: Certificate<'_>, identity: Json<SetIdentity>, config: &State<ValidatorConfig>) -> ApiResponder {
     let identity_path = match identity.identity {
         IdentityVariant::Primary => &config.keys.primary,
         IdentityVariant::Secondary => &config.keys.secondary,
