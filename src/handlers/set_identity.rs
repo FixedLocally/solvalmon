@@ -1,16 +1,15 @@
 use rocket::{mtls::Certificate, serde::json::Json, State};
-use serde::Deserialize;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
 
 use crate::{config::ValidatorConfig, responder::ApiResponder};
 
-#[derive(Debug, Deserialize, )]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum IdentityVariant {
     Primary,
     Secondary,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SetIdentity {
     pub identity: IdentityVariant,
 }
@@ -22,9 +21,7 @@ pub async fn post(_auth: Certificate<'_>, identity: Json<SetIdentity>, config: &
         IdentityVariant::Secondary => &config.keys.secondary,
     };
     match config.admin_client.set_identity(identity_path.clone(), true).await {
-        Ok(_) => return ApiResponder::success(Some(json!({
-            "identity": identity_path.to_string(),
-        })), "set_identity".to_string()),
+        Ok(_) => return ApiResponder::success_empty(),
         Err(e) => return ApiResponder::error(e.to_string()),
     }
     
