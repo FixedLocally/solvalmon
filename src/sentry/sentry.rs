@@ -136,6 +136,11 @@ pub async fn run(config: SentryConfig) {
         if !identity_depleted && (delinquent_for_too_long || nobody_voting) && no_failovers_recently {
             // delinquent, trigger failover
             print!("Delinquent for {}ms, triggering failover\n", now_ms - sanity_check_result.delinquent_since_ms);
+            if !primary_node_status.hostname.starts_with("(") {
+                // if the primary node is not already on a secondary identity, set it to secondary
+                print!("Setting primary node to secondary identity\n");
+                SentryClient::new(primary_node_status.hostname.clone(), Arc::clone(&client)).set_identity(IdentityVariant::Secondary).await;
+            }
             // find the node with the highest slot
             let new_primary = statuses.iter().max_by_key(|status| status.as_ref().unwrap().slot).unwrap().as_ref().unwrap();
             // since we're already delinquent, tower doesn't matter, just set_identity
