@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 
-use crate::{responder::ApiResponder, config::ValidatorConfig};
+use crate::{responder::ApiResponder, monitor::config::ValidatorConfig};
 
 
 #[derive(Debug, Default, Serialize, Deserialize)]

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 // use solana_core::consensus::TowerVersions;
 
-use crate::{config::ValidatorConfig, responder::ApiResponder};
+use crate::{monitor::config::ValidatorConfig, responder::ApiResponder};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PostTower {

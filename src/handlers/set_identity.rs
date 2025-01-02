@@ -1,7 +1,7 @@
 use rocket::{mtls::Certificate, serde::json::Json, State};
 use serde::{Deserialize, Serialize};
 
-use crate::{config::ValidatorConfig, responder::ApiResponder};
+use crate::{monitor::config::ValidatorConfig, responder::ApiResponder};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum IdentityVariant {

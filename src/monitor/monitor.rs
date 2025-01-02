@@ -1,14 +1,13 @@
 use std::{fs, net::Ipv4Addr, vec};
 
 use agave_validator::admin_rpc_service;
-use solvalmon::handlers::{error::{bad_request, internal_error, not_found, unauthorised}, post, set_identity, stats, status, tower};
-use solvalmon::config;
-use rocket::{catchers, config::{MutualTls, TlsConfig}, launch, Config};
+use crate::handlers::{error::{bad_request, internal_error, not_found, unauthorised}, post, set_identity, stats, status, tower};
+use super::config;
+use rocket::{catchers, config::{MutualTls, TlsConfig}, Config};
 
 const TLS_CERT_PATH: &str = "pki/tls.crt";
 const TLS_KEY_PATH: &str = "pki/tls.key";
 const MTLS_CA_PATH: &str = "pki/mtls_ca.crt";
-const CONFIG_PATH: &str = "config.json";
 
 fn panic_if_missing(path: &str) {
     match fs::exists(path) {
@@ -40,13 +39,12 @@ async fn netmon(ledger_path: String, secondary_identity_path: String) {
     }
 }
 
-#[launch]
-async fn rocket() -> _ {
+pub async fn run(config: String) -> () {
     panic_if_missing(TLS_CERT_PATH);
     panic_if_missing(TLS_KEY_PATH);
     panic_if_missing(MTLS_CA_PATH);
-    panic_if_missing(CONFIG_PATH);
-    let config = config::ValidatorConfig::new(CONFIG_PATH).await;
+    panic_if_missing(&config);
+    let config = config::ValidatorConfig::new(&config).await;
     // monitor internet connectivity
     tokio::spawn(netmon(config.ledger_dir.clone(), config.keys.secondary.clone()));
     rocket::build()
@@ -59,5 +57,5 @@ async fn rocket() -> _ {
             tls: Some(TlsConfig::from_paths(TLS_CERT_PATH, TLS_KEY_PATH)
                     .with_mutual(MutualTls::from_path(MTLS_CA_PATH))),
             ..Config::default()
-        })
+        }).launch().await.unwrap();
 }

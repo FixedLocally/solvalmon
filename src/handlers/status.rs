@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::join;
 
-use crate::{responder::ApiResponder, config::ValidatorConfig};
+use crate::{responder::ApiResponder, monitor::config::ValidatorConfig};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Status {
