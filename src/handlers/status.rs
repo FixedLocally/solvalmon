@@ -19,7 +19,7 @@ pub struct Status {
 impl Status {
     pub fn unreachable() -> Self {
         Self {
-            hostname: hostname::get().expect("gethostname").into_string().unwrap(),
+            hostname: "(unreachable)".to_string(),
             slot: 0,
             identity: "(unreachable)".to_string(),
             version: "".to_string(),
@@ -31,7 +31,7 @@ impl Status {
 
     pub fn not_running() -> Self {
         Self {
-            hostname: hostname::get().expect("gethostname").into_string().unwrap(),
+            hostname: "(not running)".to_string(),
             slot: 0,
             identity: "(not running)".to_string(),
             version: "".to_string(),
