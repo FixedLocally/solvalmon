@@ -1,5 +1,5 @@
 use clap::{command, Parser, Subcommand};
-use solvalmon::{monitor::monitor, sentry::{config::SentryConfig, sentry}};
+use solvalmon::{monitor::monitor, sentry::{config::SentryConfig, sentry}, summary::summary};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -16,6 +16,9 @@ enum Commands {
     },
     Sentry {
         config: String
+    },
+    Summary {
+        config: String
     }
 }
 
@@ -29,6 +32,10 @@ pub async fn main() {
         Commands::Sentry { config } => {
             let config = SentryConfig::new(&config);
             sentry::run(config).await;
+        }
+        Commands::Summary { config } => {
+            let config = SentryConfig::new(&config);
+            summary::run(config).await;
         }
     }
 }
