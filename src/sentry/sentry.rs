@@ -87,7 +87,8 @@ pub async fn run(config: SentryConfig) {
         // our best guess of the real time slot based on max(ref_slot, ..node_slots)
         let current_slot = max(ref_slot, node_slot);
         // distance of our last vote from the current slot, the minimum possible value is 1
-        let vote_distance = current_slot.saturating_sub(vote.votes[vote.votes.len() - 1].lockout.slot());
+        // we don't want RPC issues to trigger failover
+        let vote_distance = ref_slot.saturating_sub(vote.votes[vote.votes.len() - 1].lockout.slot());
         let node_unhealthy = vote_distance > config.checks.unhealthy_threshold;
 
         let primary_node_status = match statuses.iter().filter(|x| x.as_ref().unwrap().identity == identity.to_string()).next() {
@@ -119,8 +120,9 @@ pub async fn run(config: SentryConfig) {
             ..sanity_check_result
         };
         println!("{}", sanity_check_result);
-        let delinquent_for_too_long = sanity_check_result.delinquent_since_ms > 0 && now_ms - sanity_check_result.delinquent_since_ms >= delinquency_ms_threshold;
-        let nobody_voting = healthy_node_count == total_node_count && node_unhealthy;
+        let delinquent_for = now_ms - sanity_check_result.delinquent_since_ms;
+        let delinquent_for_too_long = sanity_check_result.delinquent_since_ms > 0 && delinquent_for >= delinquency_ms_threshold;
+        let nobody_voting = healthy_node_count == total_node_count && node_unhealthy && delinquent_for >= 5000;
         let identity_depleted = identity_balance < 895880;
         let no_failovers_recently = now_ms - sanity_check_result.failover_triggered_ms >= 10000;
         // delinquency can be due to multiple reasons
