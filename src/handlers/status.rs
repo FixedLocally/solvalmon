@@ -51,7 +51,7 @@ pub async fn get(_auth: Certificate<'_>, config: &State<ValidatorConfig>) -> Api
         config.rpc_client.get_version(),
         config.rpc_client.get_balance(&config.primary_id),
         config.rpc_client.get_genesis_hash(),
-        config.admin_client.start_time(),
+        config.admin_client().await.start_time(),
     );
     let uptime_ms = start_time.unwrap().elapsed().unwrap().as_millis() as u64;
     if slot.is_err() || identity.is_err() || version.is_err() || acct.is_err() || genesis_hash.is_err() {

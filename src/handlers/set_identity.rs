@@ -20,7 +20,7 @@ pub async fn post(_auth: Certificate<'_>, identity: Json<SetIdentity>, config: &
         IdentityVariant::Primary => &config.keys.primary,
         IdentityVariant::Secondary => &config.keys.secondary,
     };
-    match config.admin_client.set_identity(identity_path.clone(), false).await {
+    match config.admin_client().await.set_identity(identity_path.clone(), false).await {
         Ok(_) => return ApiResponder::success_empty(),
         Err(e) => return ApiResponder::error(e.to_string()),
     }

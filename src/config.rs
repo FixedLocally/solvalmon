@@ -28,7 +28,6 @@ pub struct KeysConfig {
 }
 
 pub struct ValidatorConfig {
-    pub admin_client: admin_rpc_service::AdminRpcClient,
     pub rpc_client: rpc_client::RpcClient,
     pub primary_id: Pubkey,
     pub vote_id: Pubkey,
@@ -51,12 +50,18 @@ impl ValidatorConfig {
         let primary_keypair = solana_sdk::signature::read_keypair_file(&config.keys.primary).unwrap();
         let primary_id = primary_keypair.pubkey();
         Self {
-            admin_client,
             rpc_client,
             primary_id,
             vote_id: Pubkey::from_str(&config.vote_account).unwrap(),
             ledger_dir: config.ledger_dir,
             keys: config.keys,
+        }
+    }
+
+    pub async fn admin_client(&self) -> admin_rpc_service::AdminRpcClient {
+        match admin_rpc_service::connect(&Path::new(&self.ledger_dir)).await {
+            Ok(client) => client,
+            Err(e) => panic!("Failed to connect to admin RPC: {}", e),
         }
     }
 }
