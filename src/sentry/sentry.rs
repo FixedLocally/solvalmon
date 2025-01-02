@@ -3,7 +3,7 @@ use futures::stream::FuturesUnordered;
 
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, vote::state::VoteState};
-use crate::handlers::status::Status;
+use crate::handlers::{set_identity::IdentityVariant, status::Status};
 
 use super::{client::SentryClient, config::SentryConfig};
 use tokio::join;
@@ -24,6 +24,8 @@ struct SanityCheckResult {
     identity_balance_low_since_ms: u128,
     delinquent_since_ms: u128,
     rpc_unhealthy_since_ms: u128,
+
+    failover_triggered_ms: u128,
 }
 
 impl Display for SanityCheckResult {
@@ -62,7 +64,11 @@ pub async fn run(config: SentryConfig) {
     let vote = VoteState::deserialize(&rpc_client.get_account(&vote_key).await.unwrap().data).unwrap();
     let identity = vote.authorized_voters().first().unwrap().1;
     let mut sanity_check_result = SanityCheckResult::default();
+    let delinquency_ms_threshold = 60000u64.saturating_sub(400 * config.checks.unhealthy_threshold) as u128;
+    print!("Delinquency threshold: {}ms\n", delinquency_ms_threshold);
     loop {
+        let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
+
         let statuses: FuturesUnordered<_> = nodes.iter().map(|node| tokio::spawn(node.get_status())).collect();
         let (statuses, vote_account, identity_balance, ref_slot) = join!(
             futures::future::join_all(statuses),
@@ -70,31 +76,30 @@ pub async fn run(config: SentryConfig) {
             rpc_client.get_balance(identity),
             rpc_client.get_slot(),
         );
-        let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
-        // statuses.iter().for_each(|status| {
-        //     println!("{:?}", status);
-        // });
         let vote = VoteState::deserialize(&vote_account.unwrap().data).unwrap();
         let identity_balance = identity_balance.unwrap();
         let ref_slot = ref_slot.unwrap();
-        // println!("{:?} {} {}", vote.votes[vote.votes.len() - 1], identity_balance, ref_slot);
+
         // run sanity checks
         let identity_balance_low = identity_balance < config.checks.identity_balance;
         let node_slot = statuses.iter().map(|status| status.as_ref().unwrap().slot).max().unwrap();
-        let rpc_unhealthy = ref_slot < node_slot - config.checks.unhealthy_threshold;
-        let node_unhealthy = node_slot < ref_slot - config.checks.unhealthy_threshold;
-        let primary_node_status = statuses.iter()
-            .filter(|x| x.as_ref().unwrap().identity == identity.to_string()).next();
-        let primary_node_status = match primary_node_status {
+        let rpc_unhealthy = ref_slot < node_slot - config.checks.unhealthy_threshold && node_slot > 0;
+        // our best guess of the real time slot based on max(ref_slot, ..node_slots)
+        let current_slot = max(ref_slot, node_slot);
+        // distance of our last vote from the current slot, the minimum possible value is 1
+        let vote_distance = current_slot.saturating_sub(vote.votes[vote.votes.len() - 1].lockout.slot());
+        let node_unhealthy = vote_distance > config.checks.unhealthy_threshold;
+
+        let primary_node_status = match statuses.iter().filter(|x| x.as_ref().unwrap().identity == identity.to_string()).next() {
             Some(status) => status.as_ref().unwrap(),
             None => {
                 &Status::unreachable()
             }
         };
-        let current_slot = max(ref_slot, node_slot);
-        let vote_distance = current_slot - vote.votes[vote.votes.len() - 1].lockout.slot();
+
         let healthy_node_count = statuses.iter().filter(|status| status.as_ref().unwrap().slot >= current_slot - config.checks.unhealthy_threshold).count() as u8;
         let total_node_count = statuses.len() as u8;
+
         sanity_check_result = SanityCheckResult {
             identity_balance_low,
             rpc_unhealthy,
@@ -110,8 +115,33 @@ pub async fn run(config: SentryConfig) {
             identity_balance_low_since_ms: if identity_balance_low { if sanity_check_result.identity_balance_low_since_ms == 0 {now_ms} else {sanity_check_result.identity_balance_low_since_ms} } else { 0 },
             delinquent_since_ms: if node_unhealthy { if sanity_check_result.delinquent_since_ms == 0 {now_ms} else {sanity_check_result.delinquent_since_ms} } else { 0 },
             rpc_unhealthy_since_ms: if rpc_unhealthy { if sanity_check_result.rpc_unhealthy_since_ms == 0 {now_ms} else {sanity_check_result.rpc_unhealthy_since_ms} } else { 0 },
+
+            ..sanity_check_result
         };
         println!("{}", sanity_check_result);
-        thread::sleep(Duration::from_secs(2));
+        let delinquent_for_too_long = sanity_check_result.delinquent_since_ms > 0 && now_ms - sanity_check_result.delinquent_since_ms >= delinquency_ms_threshold;
+        let nobody_voting = healthy_node_count == total_node_count && node_unhealthy;
+        let identity_depleted = identity_balance < 895880;
+        let no_failovers_recently = now_ms - sanity_check_result.failover_triggered_ms >= 10000;
+        // delinquency can be due to multiple reasons
+        // 1. identity_balance_low: not enough to pay for voting gas - nothing we can do here
+        // 2. primary node is online but validator process is falling behind - covered by the nobody_voting check and we switch to a healthy node asap
+        // 3. all nodes are on secondary identities - covered by the nobody_voting check
+        // 4. primary node is powered on but internet access is lost - the monitoring will set the validator to secondary identity after 45secs of lost connectivity
+        //    in the meantime the primary node will also be unreachable hence nobody_voting will be false, so after 60s of no voting we promote another node
+        // 5. there're just no nodes online - cry, scream, panic
+        // then after triggering a failover, we allow 10s for things to settle down
+        if !identity_depleted && (delinquent_for_too_long || nobody_voting) && no_failovers_recently {
+            // delinquent, trigger failover
+            print!("Delinquent for {}ms, triggering failover\n", now_ms - sanity_check_result.delinquent_since_ms);
+            // find the node with the highest slot
+            let new_primary = statuses.iter().max_by_key(|status| status.as_ref().unwrap().slot).unwrap().as_ref().unwrap();
+            // since we're already delinquent, tower doesn't matter, just set_identity
+            print!("Failing over to {}\n", new_primary.hostname);
+            SentryClient::new(new_primary.hostname.clone(), Arc::clone(&client)).set_identity(IdentityVariant::Primary).await;
+            sanity_check_result.failover_triggered_ms = now_ms;
+        }
+        let spent_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() - now_ms;
+        thread::sleep(Duration::from_millis(2000u64.saturating_sub(spent_ms as u64)));
     }
 }
