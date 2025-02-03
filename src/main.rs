@@ -1,5 +1,5 @@
 use clap::{command, Parser, Subcommand};
-use solvalmon::{monitor::monitor, sentry::{config::SentryConfig, sentry}, summary::summary};
+use solvalmon::{failover::failover, monitor::monitor, sentry::{config::SentryConfig, sentry}, summary::summary};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -19,6 +19,10 @@ enum Commands {
     },
     Summary {
         config: String
+    },
+    Failover {
+        config: String,
+        new_host: String
     }
 }
 
@@ -36,6 +40,10 @@ pub async fn main() {
         Commands::Summary { config } => {
             let config = SentryConfig::new(&config);
             summary::run(config).await;
+        }
+        Commands::Failover { config, new_host } => {
+            let config = SentryConfig::new(&config);
+            failover::run(config, &new_host).await;
         }
     }
 }

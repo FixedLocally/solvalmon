@@ -137,7 +137,7 @@ pub async fn run(config: SentryConfig) {
             // delinquent, trigger failover
             print!("Delinquent for {}ms, triggering failover\n", now_ms - sanity_check_result.delinquent_since_ms);
             if !primary_node_status.hostname.starts_with("(") {
-                // if the primary node is not already on a secondary identity, set it to secondary
+                // if the primary node exists, set it to secondary
                 print!("Setting primary node to secondary identity\n");
                 SentryClient::new(primary_node_status.hostname.clone(), Arc::clone(&client)).set_identity(IdentityVariant::Secondary).await;
             }
