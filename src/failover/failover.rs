@@ -18,6 +18,11 @@ pub async fn run(config: SentryConfig, new_host: &str) {
     let vote = VoteState::deserialize(&rpc_client.get_account(&config.vote_id.parse().unwrap()).await.unwrap().data).unwrap();
     let identity = vote.authorized_voters().first().unwrap().1;
     let current_primary = statuses.iter().find(|x| x.as_ref().unwrap().identity == identity.to_string());
+    let proposed_primary = statuses.iter().find(|x| x.as_ref().unwrap().hostname == new_host);
+    if proposed_primary.is_none() {
+        println!("Proposed primary is not in config");
+        return;
+    }
     let sentry_client_2 = SentryClient::new(new_host.to_string(), Arc::clone(&client));
     if let Some(current_primary) = current_primary {
         if let Ok(current_primary) = current_primary {
