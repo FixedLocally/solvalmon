@@ -2,12 +2,16 @@ use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc, thread, time::Duratio
 use futures::stream::FuturesUnordered;
 
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, vote::state::VoteState};
+use solana_sdk::{commitment_config::CommitmentConfig, native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, vote::state::VoteState};
 use crate::handlers::{set_identity::IdentityVariant, status::Status};
 
 use super::{client::SentryClient, config::SentryConfig};
 use tokio::join;
 
+const INFO_EMOJI: &str = "ℹ️";
+const WARNING_EMOJI: &str = "⚠️";
+const ERROR_EMOJI: &str = "🚨";
+const SUCCESS_EMOJI: &str = "✅";
 #[derive(Debug, Default)]
 struct SanityCheckResult {
     identity_balance_low: bool,
@@ -56,16 +60,22 @@ impl Display for SanityCheckResult {
 }
 
 pub async fn run(config: SentryConfig) {
-    let client = Arc::new(config.http_client);
     // this should never be freed by design
-    let nodes: &[SentryClient] = config.nodes.iter().map(|node| SentryClient::new(node.clone(), Arc::clone(&client))).collect::<Vec<_>>().leak();
-    let rpc_client = RpcClient::new_with_commitment(config.external_rpc, CommitmentConfig::processed());
+    let nodes: &[SentryClient] = config.nodes.iter().map(|node| SentryClient::new(node.clone(), Arc::clone(&config.http_client))).collect::<Vec<_>>().leak();
+    let rpc_client = RpcClient::new_with_commitment(config.external_rpc.clone(), CommitmentConfig::processed());
     let vote_key = Pubkey::from_str(&config.vote_id).unwrap();
     let vote = VoteState::deserialize(&rpc_client.get_account(&vote_key).await.unwrap().data).unwrap();
     let identity = vote.authorized_voters().first().unwrap().1;
     let mut sanity_check_result = SanityCheckResult::default();
     let delinquency_ms_threshold = 60000u64.saturating_sub(400 * config.checks.unhealthy_threshold) as u128;
+
+    let mut delinquent_triggered = false;
+    let mut identity_balance_triggered = false;
+    let mut rpc_unhealthy_triggered = false;
+
     print!("Delinquency threshold: {}ms\n", delinquency_ms_threshold);
+
+    config.send_webhook(&format!("{} {}: Sentry is up and running!", INFO_EMOJI, identity.to_string())).await;
     loop {
         let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
 
@@ -125,6 +135,40 @@ pub async fn run(config: SentryConfig) {
         let nobody_voting = healthy_node_count == total_node_count && node_unhealthy && delinquent_for >= 5000;
         let identity_depleted = identity_balance < 895880;
         let no_failovers_recently = now_ms - sanity_check_result.failover_triggered_ms >= 10000;
+
+        if delinquent_for_too_long {
+            if !delinquent_triggered {
+                delinquent_triggered = true;
+                config.send_webhook(&format!("{} {}: Node is delinquent", ERROR_EMOJI, &identity.to_string())).await;
+            }
+        } else {
+            if delinquent_triggered {
+                delinquent_triggered = false;
+                config.send_webhook(&format!("{} {}: Node is no longer delinquent", SUCCESS_EMOJI, &identity.to_string())).await;
+            }
+        }
+        if identity_balance_low {
+            if !identity_balance_triggered {
+                identity_balance_triggered = true;
+                config.send_webhook(&format!("{} {}: Identity balance is low - ◎{:.09}", WARNING_EMOJI, &identity.to_string(), (identity_balance as f64) / (LAMPORTS_PER_SOL as f64))).await;
+            }
+        } else {
+            if identity_balance_triggered {
+                identity_balance_triggered = false;
+                config.send_webhook(&format!("{} {}: Identity balance is ok", SUCCESS_EMOJI, &identity.to_string())).await;
+            }
+        }
+        if rpc_unhealthy {
+            if !rpc_unhealthy_triggered {
+                rpc_unhealthy_triggered = true;
+                config.send_webhook(&format!("{} {}: RPC is unhealthy - {} slots behind",WARNING_EMOJI, &identity.to_string(), node_slot - ref_slot)).await;
+            }
+        } else {
+            if rpc_unhealthy_triggered {
+                rpc_unhealthy_triggered = false;
+                config.send_webhook(&format!("{} {}: RPC is healthy", SUCCESS_EMOJI, &identity.to_string())).await;
+            }
+        }
         // delinquency can be due to multiple reasons
         // 1. identity_balance_low: not enough to pay for voting gas - nothing we can do here
         // 2. primary node is online but validator process is falling behind - covered by the nobody_voting check and we switch to a healthy node asap
@@ -139,16 +183,19 @@ pub async fn run(config: SentryConfig) {
             if !primary_node_status.hostname.starts_with("(") {
                 // if the primary node exists, set it to secondary
                 print!("Setting primary node to secondary identity\n");
-                SentryClient::new(primary_node_status.hostname.clone(), Arc::clone(&client)).set_identity(IdentityVariant::Secondary).await;
+                SentryClient::new(primary_node_status.hostname.clone(), Arc::clone(&config.http_client)).set_identity(IdentityVariant::Secondary).await;
             }
             // find the node with the highest slot
             let new_primary = statuses.iter().max_by_key(|status| status.as_ref().unwrap().slot).unwrap().as_ref().unwrap();
             // since we're already delinquent, tower doesn't matter, just set_identity
             print!("Failing over to {}\n", new_primary.hostname);
-            SentryClient::new(new_primary.hostname.clone(), Arc::clone(&client)).set_identity(IdentityVariant::Primary).await;
+            SentryClient::new(new_primary.hostname.clone(), Arc::clone(&config.http_client)).set_identity(IdentityVariant::Primary).await;
             sanity_check_result.failover_triggered_ms = now_ms;
+            config.send_webhook(&format!("{} {}: Automatically failed over to {}", INFO_EMOJI, identity.to_string(), new_primary.hostname)).await;
         }
         let spent_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() - now_ms;
-        thread::sleep(Duration::from_millis(2000u64.saturating_sub(spent_ms as u64)));
+        if spent_ms < 2000 {
+            thread::sleep(Duration::from_millis(2000u64.saturating_sub(spent_ms as u64)));
+        }
     }
 }
