@@ -1,4 +1,8 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
+
+use crate::webhook::{discord::Discord, telegram::Telegram, Webhook as _};
 
 #[derive(Deserialize, Debug)]
 pub struct PkiConfig {
@@ -19,6 +23,8 @@ pub struct SentryConfigInner {
     pub external_rpc: String,
     pub vote_id: String,
     pub checks: SentryChecks,
+    pub discord: Option<Discord>,
+    pub telegram: Option<Telegram>,
 }
 
 impl SentryConfigInner {
@@ -31,10 +37,12 @@ impl SentryConfigInner {
 }
 pub struct SentryConfig {
     pub nodes: Vec<String>,
-    pub http_client: reqwest::Client,
+    pub http_client: Arc<reqwest::Client>,
     pub external_rpc: String,
     pub vote_id: String,
     pub checks: SentryChecks,
+    pub discord: Option<Discord>,
+    pub telegram: Option<Telegram>,
 }
 
 impl SentryConfig {
@@ -51,10 +59,21 @@ impl SentryConfig {
             .unwrap();
         Self {
             nodes: inner.nodes,
-            http_client: client,
+            http_client: Arc::new(client),
             external_rpc: inner.external_rpc,
             vote_id: inner.vote_id,
             checks: inner.checks,
+            discord: inner.discord,
+            telegram: inner.telegram,
+        }
+    }
+
+    pub async fn send_webhook(&self, message: &String) {
+        if let Some(discord) = &self.discord {
+            discord.send_message(message).await.unwrap();
+        }
+        if let Some(telegram) = &self.telegram {
+            telegram.send_message(message).await.unwrap();
         }
     }
 }
