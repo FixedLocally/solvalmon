@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chrono::Utc;
 use serde::Deserialize;
 
 use crate::webhook::{discord::Discord, telegram::Telegram, Webhook as _};
@@ -69,6 +70,10 @@ impl SentryConfig {
     }
 
     pub async fn send_webhook(&self, message: &String) {
+
+        let dt = Utc::now();
+        let timestamp: i64 = dt.timestamp();
+        println!("[{}] {}", timestamp, message);
         if let Some(discord) = &self.discord {
             discord.send_message(message).await.unwrap();
         }
