@@ -129,7 +129,7 @@ pub async fn run(config: SentryConfig) {
 
             ..sanity_check_result
         };
-        println!("{}", sanity_check_result);
+        // println!("{}", sanity_check_result);
         let delinquent_for = now_ms - sanity_check_result.delinquent_since_ms;
         let delinquent_for_too_long = sanity_check_result.delinquent_since_ms > 0 && delinquent_for >= delinquency_ms_threshold;
         let nobody_voting = healthy_node_count == total_node_count && node_unhealthy && delinquent_for >= 5000;
