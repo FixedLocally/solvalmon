@@ -70,10 +70,8 @@ impl SentryConfig {
     }
 
     pub async fn send_webhook(&self, message: &String) {
-
         let dt = Utc::now();
-        let timestamp: i64 = dt.timestamp();
-        println!("[{}] {}", timestamp, message);
+        println!("[{:?}] {}", dt, message);
         if let Some(discord) = &self.discord {
             discord.send_message(message).await.unwrap();
         }

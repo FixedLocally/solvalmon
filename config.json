@@ -1,6 +1,10 @@
 {
     "vote_account": "mintrNtxN3PhAB45Pt41XqyKghTTpqcoBkQTZqh96iR",
     "ledger_dir": "/home/sol/solana/ledger",
+    "firedancer": {
+        "fdctl": "/home/sol/solana/firedancer/build/native/gcc/bin/fdctl",
+        "config_path": "/home/sol/solana/config.toml"
+    },
     "keys": {
         "primary": "/home/sol/solana/keys/identity.json",
         "secondary": "/home/sol/solana/keys/identity-secondary.json"

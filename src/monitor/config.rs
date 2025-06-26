@@ -9,6 +9,7 @@ use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Si
 struct ValidatorConfigInner {
     pub vote_account: String,
     pub ledger_dir: String,
+    pub firedancer: Option<FiredancerConfig>,
     pub keys: KeysConfig,
 }
 
@@ -27,9 +28,16 @@ pub struct KeysConfig {
     pub secondary: String,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct FiredancerConfig {
+    pub fdctl: String,
+    pub config_path: String,
+}
+
 pub struct ValidatorConfig {
     pub rpc_client: rpc_client::RpcClient,
     pub primary_id: Pubkey,
+    pub firedancer: Option<FiredancerConfig>,
     pub vote_id: Pubkey,
     pub ledger_dir: String,
     pub keys: KeysConfig,
@@ -52,6 +60,7 @@ impl ValidatorConfig {
         Self {
             rpc_client,
             primary_id,
+            firedancer: config.firedancer,
             vote_id: Pubkey::from_str(&config.vote_account).unwrap(),
             ledger_dir: config.ledger_dir,
             keys: config.keys,
