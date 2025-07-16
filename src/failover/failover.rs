@@ -45,5 +45,8 @@ pub async fn run(config: SentryConfig, new_host: &str) {
         }
     } else {
         println!("Primary not found!");
+        println!("Promoting new primary...");
+        sentry_client_2.set_identity(IdentityVariant::Primary).await;
+        println!("Done!");
     }
 }
