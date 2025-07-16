@@ -180,6 +180,7 @@ pub async fn run(config: SentryConfig) {
         if !identity_depleted && (delinquent_for_too_long || nobody_voting) && no_failovers_recently {
             // delinquent, trigger failover
             print!("Delinquent for {}ms, triggering failover\n", now_ms - sanity_check_result.delinquent_since_ms);
+            config.send_webhook(&format!("{} {}: Automatic failover triggered!", INFO_EMOJI, identity.to_string())).await;
             if !primary_node_status.hostname.starts_with("(") {
                 // if the primary node exists, set it to secondary
                 print!("Setting primary node to secondary identity\n");
