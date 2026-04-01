@@ -3,7 +3,8 @@ use std::{path::Path, str::FromStr};
 use agave_validator::admin_rpc_service;
 use serde::Deserialize;
 use solana_client::nonblocking::rpc_client;
-use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
+use solana_commitment_config::CommitmentConfig;
+use solana_sdk::{pubkey::Pubkey, signer::Signer};
 
 #[derive(Deserialize, Debug)]
 struct ValidatorConfigInner {

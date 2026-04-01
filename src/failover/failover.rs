@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use futures::stream::FuturesUnordered;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::{commitment_config::CommitmentConfig, vote::state::VoteState};
+use solana_commitment_config::CommitmentConfig;
+use solana_vote_program::vote_state::VoteStateV4;
 use tokio::join;
 
 use crate::{handlers::set_identity::IdentityVariant, sentry::{client::SentryClient, config::SentryConfig}};
@@ -15,8 +16,9 @@ pub async fn run(config: SentryConfig, new_host: &str) {
     let (statuses,) = join!(
         futures::future::join_all(statuses),
     );
-    let vote = VoteState::deserialize(&rpc_client.get_account(&config.vote_id.parse().unwrap()).await.unwrap().data).unwrap();
-    let identity = vote.authorized_voters().first().unwrap().1;
+    let vote_pk = config.vote_id.parse().unwrap();
+    let vote = VoteStateV4::deserialize(&rpc_client.get_account(&vote_pk).await.unwrap().data, &vote_pk).unwrap();
+    let identity = vote.authorized_voters.first().unwrap().1;
     let current_primary = statuses.iter().find(|x| x.as_ref().unwrap().identity == identity.to_string());
     let proposed_primary = statuses.iter().find(|x| x.as_ref().unwrap().hostname == new_host);
     if proposed_primary.is_none() {

@@ -2,7 +2,9 @@ use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc, thread, time::Duratio
 use futures::stream::FuturesUnordered;
 
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::{commitment_config::CommitmentConfig, native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, vote::state::VoteState};
+use solana_commitment_config::CommitmentConfig;
+use solana_sdk::{native_token::LAMPORTS_PER_SOL, pubkey::Pubkey};
+use solana_vote_program::vote_state::VoteStateV4;
 use crate::handlers::{set_identity::IdentityVariant, status::Status};
 
 use super::{client::SentryClient, config::SentryConfig};
@@ -64,8 +66,8 @@ pub async fn run(config: SentryConfig) {
     let nodes: &[SentryClient] = config.nodes.iter().map(|node| SentryClient::new(node.clone(), Arc::clone(&config.http_client))).collect::<Vec<_>>().leak();
     let rpc_client = RpcClient::new_with_commitment(config.external_rpc.clone(), CommitmentConfig::processed());
     let vote_key = Pubkey::from_str(&config.vote_id).unwrap();
-    let vote = VoteState::deserialize(&rpc_client.get_account(&vote_key).await.unwrap().data).unwrap();
-    let identity = vote.authorized_voters().first().unwrap().1;
+    let vote = VoteStateV4::deserialize(&rpc_client.get_account(&vote_key).await.unwrap().data, &vote_key).unwrap();
+    let identity = vote.authorized_voters.first().unwrap().1;
     let mut sanity_check_result = SanityCheckResult::default();
     let delinquency_ms_threshold = 60000u64.saturating_sub(400 * config.checks.unhealthy_threshold) as u128;
 
@@ -86,7 +88,7 @@ pub async fn run(config: SentryConfig) {
             rpc_client.get_balance(identity),
             rpc_client.get_slot(),
         );
-        let vote = VoteState::deserialize(&vote_account.unwrap().data).unwrap();
+        let vote = VoteStateV4::deserialize(&vote_account.unwrap().data, &vote_key).unwrap();
         let identity_balance = identity_balance.unwrap();
         let ref_slot = ref_slot.unwrap();
 
