@@ -2,6 +2,7 @@ use std::{io::Read, thread, time::Duration};
 
 use rocket::{mtls::Certificate, serde::json::Json, State};
 use serde::{Deserialize, Serialize};
+use wait_timeout::ChildExt;
 
 use crate::{monitor::config::ValidatorConfig, responder::ApiResponder};
 
@@ -36,10 +37,8 @@ pub async fn post(_auth: Certificate<'_>, identity: Json<SetIdentity>, config: &
         }
         let mut child = child.unwrap();
         // ...and give it 15s to complete (normally it should complete within 1-2s)
-        thread::sleep(Duration::from_secs(15));
-
         // if it completes within the time limit, handle the result
-        if let Ok(Some(status)) = child.try_wait() {
+        if let Ok(Some(status)) = child.wait_timeout(Duration::from_secs(15)) {
             if status.success() {
                 return ApiResponder::success_empty();
             } else {
