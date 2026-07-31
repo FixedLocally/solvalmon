@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::sentry::sentry::SanityCheckResult;
+
 #[derive(Deserialize, Debug)]
 pub struct Telegram {
     token: String,
@@ -13,7 +15,7 @@ impl Telegram {
 }
 
 impl super::Webhook for Telegram {
-    async fn send_message(&self, message: &String) -> Result<(), String> {
+    async fn send_message(&self, sanity_check: Option<&SanityCheckResult>, message: &String) -> Result<(), String> {
         let client = reqwest::Client::new();
         let url = format!("https://api.telegram.org/bot{}/sendMessage", self.token);
         let params = [("chat_id", &self.chat_id), ("text", &message.to_string())];

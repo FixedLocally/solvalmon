@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::sentry::sentry::SanityCheckResult;
+
 #[derive(Deserialize, Debug)]
 pub struct Discord {
     webhook_url: String,
@@ -12,7 +14,7 @@ impl Discord {
 }
 
 impl super::Webhook for Discord {
-    async fn send_message(&self, message: &String) -> Result<(), String> {
+    async fn send_message(&self, sanity_check: Option<&SanityCheckResult>, message: &String) -> Result<(), String> {
         let client = reqwest::Client::new();
         let res = client.post(&self.webhook_url)
             .header("Content-Type", "application/json")

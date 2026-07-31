@@ -3,6 +3,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use serde::Deserialize;
 
+use crate::sentry::sentry::SanityCheckResult;
 use crate::webhook::{discord::Discord, telegram::Telegram, Webhook as _};
 
 #[derive(Deserialize, Debug)]
@@ -69,14 +70,14 @@ impl SentryConfig {
         }
     }
 
-    pub async fn send_webhook(&self, message: &String) {
+    pub async fn send_webhook(&self, sanity_check: Option<&SanityCheckResult>, message: &String) {
         let dt = Utc::now();
         println!("[{:?}] {}", dt, message);
         if let Some(discord) = &self.discord {
-            discord.send_message(message).await.unwrap();
+            discord.send_message(sanity_check, message).await.unwrap();
         }
         if let Some(telegram) = &self.telegram {
-            telegram.send_message(message).await.unwrap();
+            telegram.send_message(sanity_check, message).await.unwrap();
         }
     }
 }

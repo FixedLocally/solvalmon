@@ -15,7 +15,7 @@ const WARNING_EMOJI: &str = "⚠️";
 const ERROR_EMOJI: &str = "🚨";
 const SUCCESS_EMOJI: &str = "✅";
 #[derive(Debug, Default)]
-struct SanityCheckResult {
+pub struct SanityCheckResult {
     identity_balance_low: bool,
     rpc_unhealthy: bool,
     node_unhealthy: bool,
@@ -77,7 +77,7 @@ pub async fn run(config: SentryConfig) {
 
     print!("Delinquency threshold: {}ms\n", delinquency_ms_threshold);
 
-    config.send_webhook(&format!("{} {}: Sentry is up and running!", INFO_EMOJI, identity.to_string())).await;
+    config.send_webhook(None, &format!("{} {}: Sentry is up and running!", INFO_EMOJI, identity.to_string())).await;
     loop {
         let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
 
@@ -141,34 +141,34 @@ pub async fn run(config: SentryConfig) {
         if delinquent_for_too_long {
             if !delinquent_triggered {
                 delinquent_triggered = true;
-                config.send_webhook(&format!("{} {}: Node is delinquent", ERROR_EMOJI, &identity.to_string())).await;
+                config.send_webhook(Some(&sanity_check_result), &format!("{} {}: Node is delinquent", ERROR_EMOJI, &identity.to_string())).await;
             }
         } else {
             if delinquent_triggered {
                 delinquent_triggered = false;
-                config.send_webhook(&format!("{} {}: Node is no longer delinquent", SUCCESS_EMOJI, &identity.to_string())).await;
+                config.send_webhook(Some(&sanity_check_result), &format!("{} {}: Node is no longer delinquent", SUCCESS_EMOJI, &identity.to_string())).await;
             }
         }
         if identity_balance_low {
             if !identity_balance_triggered {
                 identity_balance_triggered = true;
-                config.send_webhook(&format!("{} {}: Identity balance is low - ◎{:.09}", WARNING_EMOJI, &identity.to_string(), (identity_balance as f64) / (LAMPORTS_PER_SOL as f64))).await;
+                config.send_webhook(Some(&sanity_check_result), &format!("{} {}: Identity balance is low - ◎{:.09}", WARNING_EMOJI, &identity.to_string(), (identity_balance as f64) / (LAMPORTS_PER_SOL as f64))).await;
             }
         } else {
             if identity_balance_triggered {
                 identity_balance_triggered = false;
-                config.send_webhook(&format!("{} {}: Identity balance is ok", SUCCESS_EMOJI, &identity.to_string())).await;
+                config.send_webhook(Some(&sanity_check_result), &format!("{} {}: Identity balance is ok", SUCCESS_EMOJI, &identity.to_string())).await;
             }
         }
         if rpc_unhealthy {
             if !rpc_unhealthy_triggered {
                 rpc_unhealthy_triggered = true;
-                config.send_webhook(&format!("{} {}: RPC is unhealthy - {} slots behind",WARNING_EMOJI, &identity.to_string(), node_slot - ref_slot)).await;
+                config.send_webhook(Some(&sanity_check_result), &format!("{} {}: RPC is unhealthy - {} slots behind", WARNING_EMOJI, &identity.to_string(), node_slot - ref_slot)).await;
             }
         } else {
             if rpc_unhealthy_triggered {
                 rpc_unhealthy_triggered = false;
-                config.send_webhook(&format!("{} {}: RPC is healthy", SUCCESS_EMOJI, &identity.to_string())).await;
+                config.send_webhook(Some(&sanity_check_result), &format!("{} {}: RPC is healthy", SUCCESS_EMOJI, &identity.to_string())).await;
             }
         }
         // delinquency can be due to multiple reasons
@@ -182,7 +182,7 @@ pub async fn run(config: SentryConfig) {
         if !identity_depleted && (delinquent_for_too_long || nobody_voting) && no_failovers_recently {
             // delinquent, trigger failover
             print!("Delinquent for {}ms, triggering failover\n", now_ms - sanity_check_result.delinquent_since_ms);
-            config.send_webhook(&format!("{} {}: Automatic failover triggered!", INFO_EMOJI, identity.to_string())).await;
+            config.send_webhook(Some(&sanity_check_result), &format!("{} {}: Automatic failover triggered!", INFO_EMOJI, identity.to_string())).await;
             if !primary_node_status.hostname.starts_with("(") {
                 // if the primary node exists, set it to secondary
                 print!("Setting primary node to secondary identity\n");
@@ -194,7 +194,7 @@ pub async fn run(config: SentryConfig) {
             print!("Failing over to {}\n", new_primary.hostname);
             SentryClient::new(new_primary.hostname.clone(), Arc::clone(&config.http_client)).set_identity(IdentityVariant::Primary).await;
             sanity_check_result.failover_triggered_ms = now_ms;
-            config.send_webhook(&format!("{} {}: Automatically failed over to {}", INFO_EMOJI, identity.to_string(), new_primary.hostname)).await;
+            config.send_webhook(Some(&sanity_check_result), &format!("{} {}: Automatically failed over to {}", INFO_EMOJI, identity.to_string(), new_primary.hostname)).await;
         }
         let spent_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() - now_ms;
         if spent_ms < 2000 {
