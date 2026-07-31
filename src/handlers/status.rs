@@ -45,13 +45,14 @@ impl Status {
 #[rocket::get("/status")]
 pub async fn get(_auth: Certificate<'_>, config: &State<ValidatorConfig>) -> ApiResponder {
     // according to the validator's source code, none of these requires --full-rpc-api
+    let admin_client = config.admin_client().await;
     let (slot, identity, version, acct, genesis_hash, start_time) = join!(
         config.rpc_client.get_slot(),
         config.rpc_client.get_identity(),
         config.rpc_client.get_version(),
         config.rpc_client.get_balance(&config.primary_id),
         config.rpc_client.get_genesis_hash(),
-        config.admin_client().await.start_time(),
+        admin_client.start_time(),
     );
     let uptime_ms = start_time.unwrap().elapsed().unwrap().as_millis() as u64;
     if slot.is_err() || identity.is_err() || version.is_err() || acct.is_err() || genesis_hash.is_err() {
