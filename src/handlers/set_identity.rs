@@ -96,10 +96,45 @@ pub async fn post(_auth: Certificate<'_>, identity: Json<SetIdentity>, config: &
             Err(e) => return ApiResponder::error(format!("Process timed out and can't be killed {e}"))
         }
     } else {
-        match config.admin_client().await.set_identity(identity_path.clone(), false).await {
-            Ok(_) => return ApiResponder::success_empty(),
+        match config.admin_client().await.pid().await {
+            Ok(pid) => {
+                // agave 4.2.0 changed the shape of set_identity so we just use the validator's own binary to control the validator
+                let bin_path = format!("/proc/{pid}/exe");
+                // run `$BIN "set-identity" identity_path`
+                match spawn_child(vec![bin_path, "set-identity".to_string(), identity_path.clone()], Duration::from_secs(3)) {
+                    Ok(_) => return ApiResponder::success_empty(),
+                    Err(e) => return ApiResponder::error(e.to_string()),
+                }
+            }
             Err(e) => return ApiResponder::error(e.to_string()),
         }
     }
-    
+}
+
+fn spawn_child(args: Vec<String>, timeout: Duration) -> Result<(), String> {
+    let child = std::process::Command::new(&args[0])
+        .args(&args[1..])
+        .spawn();
+    if child.is_err() {
+        return Err("cannot spawn child process".to_string());
+    }
+    let mut child = child.unwrap();
+    if let Ok(Some(status)) = child.wait_timeout(timeout) {
+        if status.success() {
+            return Ok(());
+        } else {
+            let err_msg = if let Some(mut stderr) = child.stderr {
+                let mut buf = [0u8; 1024];
+                if let Ok(size) = stderr.read(&mut buf) {
+                    String::from_utf8_lossy(&buf[0..size]).to_string()
+                } else {
+                    "".to_string()
+                }
+            } else {
+                "".to_string()
+            };
+            return Err(format!("Failed to execute command: {} ({})", err_msg, status.code().unwrap_or(-1)));
+        }
+    }
+    Err("Process timed out".to_string())
 }
